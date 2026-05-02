@@ -28,7 +28,7 @@ VERSION   = _get("VERSION",   "2.1.0")
 DEVELOPER = _get("DEVELOPER", "Strykey")
 
 # ── GitHub repo ───────────────────────────────────────────────────────────────
-GITHUB_REPO_OWNER = _get("GITHUB_REPO_OWNER", "DanielPires2000")
+GITHUB_REPO_OWNER = _get("GITHUB_REPO_OWNER", "Strykey")
 GITHUB_REPO_NAME  = _get("GITHUB_REPO_NAME",  "orbshacker")
 REPO_URL          = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}"
 
