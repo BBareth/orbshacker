@@ -88,7 +88,7 @@ cd orbshacker
 pip install -r requirements.txt
 ```
 
-Place `exe.exe` in the project root directory. This is the base executable that gets copied and renamed for each fake process.
+When run from source, the base executable is your own Python interpreter: it gets copied, renamed to the game's process name, and launched running a small timer window. No `exe.exe` needs to be supplied. (In the packaged release build, the tool copies itself instead.)
 
 <br/>
 
@@ -124,7 +124,7 @@ Launch the tool. Select your first game. After the process is launched, press En
 
 ## How it works
 
-The tool connects to Discord's official API (`/api/v9/applications/detectable`) to get the live game list. It extracts the exact process name Discord expects for each game. It copies `exe.exe` to `Desktop/Win64/`, renames the copy to match the game's executable name, and launches it in the background. The process stays running until you close it. Discord keeps detecting it for as long as it runs.
+The tool connects to Discord's official API (`/api/v9/applications/detectable`) to get the live game list. It extracts the exact process name Discord expects for each game. It copies the base executable to `Desktop/Win64/`, renames the copy to match the game's executable name, and launches it in the background. The process stays running until you close it. Discord keeps detecting it for as long as it runs.
 
 Steam Quest Mode adds a layer: it generates a fake `appmanifest_<appid>.acf` in `steamapps/` and places the executable in `steamapps/common/<game>/`, satisfying Discord's additional manifest check for games like Marathon or Toxic Commando.
 

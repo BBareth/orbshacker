@@ -5,6 +5,7 @@ In frozen (.exe) mode:   copies orbshacker.exe itself → GameName.exe (--timer-
 In source mode:           copies pythonw.exe → GameName.exe + _orbshacker_timer.pyw
 """
 
+import os
 import sys
 import shutil
 import subprocess
@@ -79,15 +80,44 @@ class GameFaker:
         """Copy the faker executable to *target_path*.
 
         In source mode, also creates a ``_orbshacker_timer.pyw`` next to
-        the target so the renamed Python interpreter can run it.
+        the target so the renamed Python interpreter can run it, and writes
+        a ``pyvenv.cfg`` so the copied interpreter can still locate its
+        runtime once separated from its original directory. Without this the
+        copied process exits immediately (error 106) and Discord never sees
+        it in the process list.
         """
         target_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(self._source_exe, target_path)
 
         if not self._frozen:
+            self._write_pyvenv_cfg(target_path.parent)
             timer_script = target_path.parent / "_orbshacker_timer.pyw"
             if not timer_script.exists():
                 timer_script.write_text(_TIMER_PYW_CODE, encoding="utf-8")
+
+    def _write_pyvenv_cfg(self, dest_dir: Path) -> None:
+        """Ensure a ``pyvenv.cfg`` sits next to the copied interpreter.
+
+        A copied CPython launcher locates its standard library via a
+        ``pyvenv.cfg`` whose ``home`` points at the base install. We reuse
+        the existing one if the source is a venv, otherwise synthesise one
+        from ``sys.base_prefix``.
+        """
+        cfg = dest_dir / "pyvenv.cfg"
+        if cfg.exists():
+            return
+        # If we're running from a venv, copy its pyvenv.cfg verbatim.
+        for parent in (self._source_exe.parent, self._source_exe.parent.parent):
+            existing = parent / "pyvenv.cfg"
+            if existing.exists():
+                shutil.copy2(existing, cfg)
+                return
+        # Non-venv interpreter: point home at the base install directory.
+        base = Path(getattr(sys, "base_prefix", sys.prefix))
+        cfg.write_text(
+            f"home = {base}\ninclude-system-site-packages = false\n",
+            encoding="utf-8",
+        )
 
     def create_fake_game(self, exe_name: str) -> Path | None:
         """Create fake game executable under Desktop/<FAKE_EXE_DIR>/."""
@@ -110,11 +140,20 @@ class GameFaker:
         try:
             loading_animation("Launching process", 0.8)
 
+            env = None
             if self._frozen:
                 args = [str(exe_path), "--timer-mode"]
             else:
                 timer_script = exe_path.parent / "_orbshacker_timer.pyw"
                 args = [str(exe_path), str(timer_script)]
+                # The copied interpreter is separated from its runtime, so the
+                # OS loader can't find pythonXX.dll on its own. Put the original
+                # interpreter's home directory on PATH for the child so the DLL
+                # (and Tcl/Tk for the timer window) resolves. Without this the
+                # process dies instantly with "pythonXX.dll was not found".
+                env = os.environ.copy()
+                home = str(self._source_exe.parent)
+                env["PATH"] = home + os.pathsep + env.get("PATH", "")
 
             if sys.platform == 'win32':
                 DETACHED_PROCESS = 0x00000008
@@ -124,6 +163,7 @@ class GameFaker:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
+                    env=env,
                 )
             else:
                 subprocess.Popen(
@@ -132,6 +172,7 @@ class GameFaker:
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
                     start_new_session=True,
+                    env=env,
                 )
 
             print_color("[OK] Process launched in background", Colors.GREEN, bold=True)
